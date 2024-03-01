@@ -5,14 +5,13 @@ import random as rand
 from datetime import date, datetime, timedelta
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
-
 def connect():
     global cnx
     global cursor
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
-        password="CSD@mysql-1872",
+        password="JmanLivanec75898319!",
         port='3306',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
@@ -58,11 +57,60 @@ def insert_athlete(fn, ln, grad, home, sex, dob):
     #return to homepage
     return None
 
+def insert_race(rn, city, state, type, rdate, s_dist, s_type, b_dist, b_elev, r_dist, r_elev):
+    # check validity
+
+    race_info = {'RaceName' : rn, 'City' : city, 'State' : state, 'Type' : type, 'RaceDate' : rdate}
+    add_race = ("INSERT INTO race"
+                   "(RaceName, City, State, Type, RaceDate)"
+                   "VALUES (%(RaceName)s, %(City)s, %(State)s, %(Type)s, %(RaceDate)s)")
+    cursor.execute(add_race, race_info)
+
+    swim_info = {'RaceName' : rn, 'RaceDate' : rdate, 'LegName' : 'swim', 'Distance' : s_dist, 'Elevation' : s_type}
+    bike_info = {'RaceName' : rn, 'RaceDate' : rdate, 'LegName' : 'bike', 'Distance' : b_dist, 'Elevation' : b_elev}
+    run_info = {'RaceName' : rn, 'RaceDate' : rdate, 'LegName' : 'run', 'Distance' : r_dist, 'Elevation' : r_elev}
+    add_leg = ("INSERT INTO leg"
+                "(RaceName, RaceDate, LegName, Distance, Elevation)"
+                "VALUES (%(RaceName)s, %(RaceDate)s, %(LegName)s, %(Distance)s, %(Elevation)s)")
+
+    cursor.execute(add_leg, swim_info)
+    cursor.execute(add_leg, bike_info)
+    cursor.execute(add_leg, run_info)
+    cnx.commit()
+    ui.notify("Race {0} Added".format(rn))
+    #return to homepage
+    return None
+
+def update_race(rn, city, state, type, rdate, s_dist, s_type, b_dist, b_elev, r_dist, r_elev):
+    leg_query = "UPDATE leg SET Distance = %s, Elevation = %s WHERE (RaceName = %s AND RaceDate = %s AND LegName = %s)"
+    swim_params = (s_dist, s_type, rn, rdate, 'swim')
+    bike_params = (b_dist, b_elev, rn, rdate, 'bike')
+    run_params = (r_dist, r_elev, rn, rdate, 'run')
+    cursor.execute(leg_query, swim_params)
+    cursor.execute(leg_query, bike_params)
+    cursor.execute(leg_query, run_params)
+
+    race_query = "UPDATE race SET City = %s, State = %s, Type = %s WHERE (RaceName = %s AND RaceDate = %s)"
+    race_params = (city, state, type, rn, rdate)
+    cursor.execute(race_query, race_params)
+    
+    ui.notify("Updated Race {0}".format(rn))
+    cnx.commit()
+    return None
+
 def remove_athlete(a_id, athletes):
     query = "DELETE FROM athlete WHERE (AthleteID = %s)"
     athlete_id = (a_id,)
     cursor.execute(query, athlete_id)
     ui.notify("Deleted Athlete " + athletes[a_id])
+    cnx.commit()
+    return None
+
+def remove_race(rn, rdate):
+    query = 'DELETE FROM race WHERE (RaceName = %s AND RaceDate = %s)'
+    params = (rn, rdate)
+    cursor.execute(query, params)
+    ui.notify("Deleted race " + rn)
     cnx.commit()
     return None
 
@@ -171,7 +219,6 @@ def ins_race_page():
         with ui.menu() as menu:
             ui.date().bind_value(date)
 
-
     #### legs ####
             
     #only issue I see is that elevation and distance are varchar rather than float or int, didn't want to make
@@ -193,10 +240,10 @@ def ins_race_page():
     ui.label('Run Elevation')
     run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    #update this, add legs as well
-    ui.button('Submit', on_click = lambda: insert_athlete(fn_input.value, ln_input.value, grad_input.value, home_input.value, sex_input.value, date.value))
+    ui.button('Submit', on_click = lambda:insert_race(name_input.value, city.value, state.value, r_type.value, date.value, swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
 
 #################################################
+    
     
 #delete race
 @ui.page('/del_race_page')
@@ -204,16 +251,18 @@ def del_race_page():
     if not is_connected():
         connect()
     ui.label('Choose Race to Delete')
-    # I'm thinking "RaceName, Date" for the dropdown
     races = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        races[a_id] = (ln + ", " + fn)
+    rid = {}
+    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+    for (rn, rd) in cursor:
+        r_id = ''.join(["{}".format(rand.randint(0, 9)) for _ in range(0, 9)])
+        races[r_id] = (rn + ", " + str(rd))
+        rid[r_id] = [rn, rd]
 
     #result = 0
     del_race = ui.select(options= races, label='Choose Race', with_input=True)#.bind_value_to(globals(), 'result')
     
-    ui.button('Delete', color='red', on_click = lambda: remove_athlete(del_athlete.value, athletes))
+    ui.button('Delete', color='red', on_click = lambda: remove_race(rid[del_race.value][0], rid[del_race.value][1]))
 
 #################################################
     
@@ -224,9 +273,12 @@ def upd_race_page():
         connect()
     ui.label('Choose Race to Update')
     races = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        races[a_id] = (ln + ", " + fn)
+    rid = {}
+    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+    for (rn, rd) in cursor:
+        r_id = ''.join(["{}".format(rand.randint(0, 9)) for _ in range(0, 9)])
+        races[r_id] = (rn + ", " + str(rd))
+        rid[r_id] = [rn, rd]
     
     upd_race = ui.select(options= races, label='Choose Race', with_input=True)
     
@@ -245,8 +297,6 @@ def upd_race_page():
 
     #### legs ####
             
-    #only issue I see is that elevation and distance are varchar rather than float or int, didn't want to make
-    #them number fields so left as text input
     
     ui.label('Swim Leg')
     swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
@@ -264,9 +314,7 @@ def upd_race_page():
     ui.label('Run Elevation')
     run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    ui.button('Confirm Changes', color='green', on_click = lambda: update_athlete(upd_athlete.value, fn_input.value,
-                                                                                ln_input.value, grad_input.value, home_input.value,
-                                                                                sex_input.value, date.value))
+    ui.button('Confirm Changes', color='green', on_click = lambda: update_race(rid[upd_race.value][0], city.value, state.value, r_type.value, rid[upd_race.value][1], swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
 
 #################################################
 
