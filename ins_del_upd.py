@@ -11,7 +11,7 @@ def connect():
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
-        password="JmanLivanec75898319!",
+        password="",
         port='3306',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
