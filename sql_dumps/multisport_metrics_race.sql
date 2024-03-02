@@ -1,3 +1,5 @@
+CREATE DATABASE  IF NOT EXISTS `multisport_metrics` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `multisport_metrics`;
 -- MySQL dump 10.13  Distrib 8.0.36, for Win64 (x86_64)
 --
 -- Host: localhost    Database: multisport_metrics
@@ -25,7 +27,7 @@ DROP TABLE IF EXISTS `race`;
 CREATE TABLE `race` (
   `RaceName` varchar(30) NOT NULL,
   `City` varchar(20) DEFAULT NULL,
-  `State` varchar(11) DEFAULT NULL,
+  `State` varchar(20) DEFAULT NULL,
   `Type` enum('sprint','olympic','half ironman','ironman','other') DEFAULT NULL,
   `RaceDate` date NOT NULL,
   PRIMARY KEY (`RaceName`,`RaceDate`)
@@ -51,4 +53,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-02-29 20:29:00
+-- Dump completed on 2024-03-02 16:58:35
