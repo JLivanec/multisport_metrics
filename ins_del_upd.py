@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
 def get_id(size):
-    return ''.join(["{}".format(rand.randint(0, size)) for _ in range(0, size)])
+    return ''.join(["{}".format(rand.randint(0, 9)) for _ in range(0, size)])
 
 def connect():
     global cnx
@@ -292,7 +292,7 @@ def ins_race_page():
     if not is_connected():
         connect()
     ui.label('Input Race Info')
-    name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 30})
+    name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 90})
     city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
     state = ui.select(options= state_names, label='Choose State', with_input=True)
     ui.label('Race Type')
