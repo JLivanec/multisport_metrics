@@ -14,7 +14,7 @@ def connect():
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
-        password="",
+        password="CSD@mysql-1872",
         port='3306',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
@@ -47,7 +47,7 @@ def sum_time(h, m, s):
     return hms_to_s(h, m, s)
 
 
-def s_to_hms(s):
+def s_to_hms(h, m, s):
     h = s // 3600
     s = s % 3600
     m = s // 60
@@ -504,6 +504,115 @@ def del_results_page():
 
     ui.button('Delete', color='red', on_click = lambda: remove_race_results(rid[race_choice.value][0], rid[race_choice.value][1], athlete_choice.value))
 
+
+@ui.page('/race_results')
+def race_results_page():
+    if not is_connected():
+        connect()
+    ui.label('Choose Race to View')
+    races = {}
+    rid = {}
+    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+    for (rn, rd) in cursor:
+        r_id = get_id(10)
+        races[r_id] = (rn + ", " + str(rd))
+        rid[r_id] = [rn, rd]
+    cursor.execute('SELECT athlete.FirstName, athlete.LastName, raceresults.TimeTotal FROM athlete LEFT JOIN raceresults ' + 
+                        'ON raceresults.AthleteID = athlete.AthleteID WHERE raceresults.RaceName LIKE("Patriots Olympic") AND raceresults.RaceDate ' +
+                        '= "2023-06-18" ORDER BY athlete.LastName ASC')
+    athletes = []
+    for fn, ln, tt in cursor:
+        athlete = {
+            "First Name": fn,
+            "Last Name": ln,
+            "Total Time": tt
+        }
+        athletes.append(athlete)
+    grid = ui.aggrid({
+    'columnDefs': [
+        {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+    ],
+    'rowData': athletes
+    }).classes('min-h-screen')
+    ui.run()
+
+
+@ui.page('/all_results')
+def all_results_page():
+    if not is_connected():
+        connect()
+    ui.label('All Results')
+    cursor.execute('''WITH results AS(
+                        SELECT
+                            legresults.AthleteID,
+                            legresults.RaceName,
+                            legresults.RaceDate,
+                            MAX(CASE WHEN legresults.LegName = 'swim' THEN legresults.Time ELSE 0 END) AS "swim_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T1' THEN transitionresults.Time ELSE 0 END) AS "t1_time",
+                            MAX(CASE WHEN legresults.LegName = 'bike' THEN legresults.Time ELSE 0 END) AS "bike_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T2' THEN transitionresults.Time ELSE 0 END) AS "t2_time",
+                            MAX(CASE WHEN legresults.LegName = 'run' THEN legresults.Time ELSE 0 END) AS "run_time",
+                            MAX(raceresults.TimeTotal) AS "total_time"
+                            FROM legresults
+                            LEFT JOIN transitionresults
+                            ON legresults.AthleteID = transitionresults.AthleteID AND
+                                legresults.RaceName = transitionresults.RaceName AND
+                                legresults.RaceDate = transitionresults.RaceDate
+                            LEFT JOIN raceresults
+                            ON legresults.AthleteID = raceresults.AthleteID AND
+                                legresults.RaceName = raceresults.RaceName AND
+                                legresults.RaceDate = raceresults.RaceDate
+                            GROUP BY AthleteID, RaceName, RaceDate
+                    )
+                    SELECT 
+                        athlete.LastName,
+                        athlete.FirstName,
+                        results.RaceName,
+                        results.RaceDate,
+                        results.swim_time,
+                        results.t1_time,
+                        results.bike_time,
+                        results.t2_time,
+                        results.run_time,
+                        results.total_time
+                    FROM athlete
+                    LEFT JOIN results
+                    ON athlete.AthleteID = results.AthleteID
+                    WHERE results.RaceName IS NOT NULL''')
+    results = []
+    for ln, fn, rn, rd, st, t1, bt, t2, rt, tt in cursor:
+        athlete = {
+            "Last Name": ln,
+            "First Name": fn,
+            "Race Name": rn,
+            "Race Date": rd,
+            "Swim Time": st,
+            "T1 Time": t1,
+            "Bike Time": bt,
+            "T2 Time": t2,
+            "Run Time": rt,
+            "Total Time": tt
+        }
+        results.append(athlete)
+    grid = ui.aggrid({
+    'columnDefs': [
+        {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Race Name', 'field': 'Race Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Race Date', 'field': 'Race Date', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Swim Time', 'field': 'Swim Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
+        {'headerName': 'T1 Time', 'field': 'T1 Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Bike Time', 'field': 'Bike Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
+        {'headerName': 'T2 Time', 'field': 'T2 Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Run Time', 'field': 'Run Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+    ],
+    'rowData': results
+    }).classes('min-h-screen')
+    ui.run()
+
 #################################################
 
 ui.link('Insert Athlete', ins_athlete_page)
@@ -516,5 +625,6 @@ ui.link('Update Race', upd_race_page)
 ui.link('Delete Athlete', del_athlete_page)
 ui.link('Delete Race', del_race_page)
 ui.link('Delete Race Results', del_results_page)
-
+ui.link('View Race Results', race_results_page)
+ui.link('All Results', all_results_page)
 ui.run()
