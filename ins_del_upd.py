@@ -14,7 +14,7 @@ def connect():
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
-        password="CSD@mysql-1872",
+        password="",
         port='3306',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
@@ -580,7 +580,8 @@ def all_results_page():
                     FROM athlete
                     LEFT JOIN results
                     ON athlete.AthleteID = results.AthleteID
-                    WHERE results.RaceName IS NOT NULL''')
+                    WHERE results.RaceName IS NOT NULL
+                    ORDER BY athlete.LastName ASC, athlete.FirstName ASC, results.RaceDate DESC''')
     results = []
     for ln, fn, rn, rd, st, t1, bt, t2, rt, tt in cursor:
         athlete = {
