@@ -47,12 +47,21 @@ def sum_time(h, m, s):
     return hms_to_s(h, m, s)
 
 
-def s_to_hms(h, m, s):
+def s_to_hms(s):
     h = s // 3600
     s = s % 3600
     m = s // 60
     s = s % 60
     return h, m, s
+
+def get_timestring(time_total):
+    h, m, s = s_to_hms(time_total)
+    if not time_total:
+        return ("--")
+    if h and m:
+        return ("{0}:{1}:{2}".format(int(h), str(int(m)).zfill(2), str(int(s)).zfill(2)))
+    else:
+       return ("{0}:{1}".format(str(int(m)).zfill(2), str(int(s)).zfill(2)))
 
 def insert_athlete(fn, ln, grad, home, sex, dob):
     # check validity
@@ -214,6 +223,7 @@ def remove_race_results(rname, rdate, a_id):
 def ins_athlete_page():
     if not is_connected():
         connect()
+    ui.page_title('Insert Athlete')
     ui.label('Input Athlete Info')
     fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
     ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
@@ -237,6 +247,7 @@ def ins_athlete_page():
 def del_athlete_page():
     if not is_connected():
         connect()
+    ui.page_title('Delete Athlete')
     ui.label('Choose Athlete to Delete')
     athletes = {}
     cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
@@ -255,6 +266,7 @@ def del_athlete_page():
 def upd_athlete_page():
     if not is_connected():
         connect()
+    ui.page_title('Update Athlete')
     ui.label('Choose Athlete to Update')
     athletes = {}
     cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
@@ -291,6 +303,12 @@ def upd_athlete_page():
 def ins_race_page():
     if not is_connected():
         connect()
+    ui.page_title('Insert Race')
+
+    with ui.row():
+        ui.link('Insert Athlete', ins_athlete_page)
+        ui.link('Insert Race', ins_race_page)
+
     ui.label('Input Race Info')
     name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 90})
     city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
@@ -303,11 +321,6 @@ def ins_race_page():
             ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
         with ui.menu() as menu:
             ui.date().bind_value(date)
-
-    #### legs ####
-            
-    #only issue I see is that elevation and distance are varchar rather than float or int, didn't want to make
-    #them number fields so left as text input
     
     ui.label('Swim Leg')
     swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
@@ -335,6 +348,7 @@ def ins_race_page():
 def del_race_page():
     if not is_connected():
         connect()
+    ui.page_title('Delete Race')
     ui.label('Choose Race to Delete')
     races = {}
     rid = {}
@@ -356,6 +370,7 @@ def del_race_page():
 def upd_race_page():
     if not is_connected():
         connect()
+    ui.page_title('Update Race')
     ui.label('Choose Race to Update')
     races = {}
     rid = {}
@@ -408,6 +423,7 @@ def upd_race_page():
 def ins_results_page():
     if not is_connected():
         connect()
+    ui.page_title('Insert Results')
     ui.label('Input Race Results')
     races = {}
     rid = {}
@@ -485,6 +501,7 @@ def ins_results_page():
 def del_results_page():
     if not is_connected():
         connect()
+    ui.page_title('Delete Results')
     ui.label('Choose Result to Delete')
     races = {}
     rid = {}
@@ -509,6 +526,7 @@ def del_results_page():
 def race_results_page():
     if not is_connected():
         connect()
+    ui.page_title('View Results')
     ui.label('Choose Race to View')
     races = {}
     rid = {}
@@ -543,6 +561,7 @@ def race_results_page():
 def all_results_page():
     if not is_connected():
         connect()
+    ui.page_title('All Results')
     ui.label('All Results')
     cursor.execute('''WITH results AS(
                         SELECT
@@ -589,12 +608,12 @@ def all_results_page():
             "First Name": fn,
             "Race Name": rn,
             "Race Date": rd,
-            "Swim Time": st,
-            "T1 Time": t1,
-            "Bike Time": bt,
-            "T2 Time": t2,
-            "Run Time": rt,
-            "Total Time": tt
+            "Swim Time": get_timestring(st),
+            "T1 Time": get_timestring(t1),
+            "Bike Time": get_timestring(bt),
+            "T2 Time": get_timestring(t2),
+            "Run Time": get_timestring(rt),
+            "Total Time": get_timestring(tt)
         }
         results.append(athlete)
     grid = ui.aggrid({
@@ -627,5 +646,6 @@ ui.link('Delete Athlete', del_athlete_page)
 ui.link('Delete Race', del_race_page)
 ui.link('Delete Race Results', del_results_page)
 ui.link('View Race Results', race_results_page)
+
 ui.link('All Results', all_results_page)
 ui.run()
