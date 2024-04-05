@@ -14,7 +14,7 @@ def connect():
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
-        password="",
+        password="CSD@mysql-1872",
         port='3306',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
@@ -521,7 +521,6 @@ def del_results_page():
 
     ui.button('Delete', color='red', on_click = lambda: remove_race_results(rid[race_choice.value][0], rid[race_choice.value][1], athlete_choice.value))
 
-
 @ui.page('/race_results')
 def race_results_page():
     if not is_connected():
@@ -535,34 +534,105 @@ def race_results_page():
         r_id = get_id(10)
         races[r_id] = (rn + ", " + str(rd))
         rid[r_id] = [rn, rd]
-    cursor.execute('SELECT athlete.FirstName, athlete.LastName, raceresults.TimeTotal FROM athlete LEFT JOIN raceresults ' + 
-                        'ON raceresults.AthleteID = athlete.AthleteID WHERE raceresults.RaceName LIKE("Patriots Olympic") AND raceresults.RaceDate ' +
-                        '= "2023-06-18" ORDER BY athlete.LastName ASC')
-    athletes = []
-    for fn, ln, tt in cursor:
-        athlete = {
-            "First Name": fn,
-            "Last Name": ln,
-            "Total Time": tt
-        }
-        athletes.append(athlete)
+    race_choice = ui.select(options= races, label='Choose Race', with_input=True)
+    race_button = ui.button('Get Race Results')
+
+    athletes = {}
+    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
+    for (a_id, fn, ln) in cursor:
+        athletes[a_id] = (ln + ", " + fn)
+    #### this is the value for athlete ####
+    athlete_choice = ui.select(options= athletes, label='Choose Athlete', with_input=True)
+    athlete_button = ui.button('Get All Athlete Races')
+
     grid = ui.aggrid({
-    'columnDefs': [
-        {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-        {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-        {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
-    ],
-    'rowData': athletes
+        'columnDefs': [],
+        'rowData': []
     }).classes('min-h-screen')
+
+    ####possibly a way to specify an a specific race for a specific athlete####
+
+
+
+    def filter_athlete():
+        ####this is filtering by athlete, need query with more info#####
+        #### change for loop and header names####
+        
+        race_query = ('Query for all results for the chosen athlete')
+        race_params = (rid[race_choice.value][0], rid[race_choice.value][1])
+        cursor.execute(race_query, race_params)
+        results = []
+        for '''race name and stats''' in cursor:
+            result = {
+                #race name and stats as keys
+            }
+            results.append(result)
+        #rename headers for info we're getting about athlete's results
+        grid.options['columnDefs'] = [
+                                {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+                                {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+                                {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+        ]
+        grid.options['rowData'] = results
+
+        grid.update()
+    
+    athlete_button.on('click',filter_athlete)
+    #button = ui.button('Submit', on_click=filter_grid)
+
+    ui.run()
+
+
+    def filter_race():
+        ####this is filtering by race, need query with more info#####
+        #### change for loop and header names####
+        
+        race_query = ('SELECT athlete.FirstName, athlete.LastName, raceresults.TimeTotal FROM athlete LEFT JOIN raceresults ' + 
+                      'ON raceresults.AthleteID = athlete.AthleteID WHERE raceresults.RaceName LIKE(%s) AND raceresults.RaceDate ' +
+                      '= %s ORDER BY athlete.LastName ASC')
+        race_params = (rid[race_choice.value][0], rid[race_choice.value][1])
+        cursor.execute(race_query, race_params)
+        results = []
+        for fn, ln, tt in cursor:
+            result = {
+                "First Name": fn,
+                "Last Name": ln,
+                "Total Time": tt
+            }
+            results.append(result)
+        grid.options['columnDefs'] = [
+                                {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+                                {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+                                {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+        ]
+        grid.options['rowData'] = results
+
+        grid.update()
+    race_button.on('click',filter_race)
+    athlete_button.on('click',filter_athlete)
+
+    #button = ui.button('Submit', on_click=filter_grid)
+
     ui.run()
 
 
 @ui.page('/all_results')
 def all_results_page():
+    
     if not is_connected():
         connect()
     ui.page_title('All Results')
     ui.label('All Results')
+    races = {}
+    rid = {}
+    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+    for (rn, rd) in cursor:
+        r_id = get_id(10)
+        races[r_id] = (rn + ", " + str(rd))
+        rid[r_id] = [rn, rd]
+    race_choice = ui.select(options= races, label='Choose Race', with_input=True)
+    button = ui.button('Submit')
+    ### maybe just modify this for filter_athlete query ###
     cursor.execute('''WITH results AS(
                         SELECT
                             legresults.AthleteID,
@@ -621,7 +691,7 @@ def all_results_page():
         {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
         {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
         {'headerName': 'Race Name', 'field': 'Race Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-        {'headerName': 'Race Date', 'field': 'Race Date', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
+        {'headerName': 'Race Date', 'field': 'Race Date', 'filter': 'agDateColumnFilter', 'floatingFilter': True},
         {'headerName': 'Swim Time', 'field': 'Swim Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
         {'headerName': 'T1 Time', 'field': 'T1 Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
         {'headerName': 'Bike Time', 'field': 'Bike Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True},
