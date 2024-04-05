@@ -8,14 +8,24 @@ state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "Ca
 def get_id(size):
     return ''.join(["{}".format(rand.randint(0, 9)) for _ in range(0, size)])
 
+def login(un, pw):
+    global username
+    global password
+    username=un
+    password=pw
+    connect()
+    if is_connected():
+        ui.open(homepage)
+    else:
+        ui.notify('Username or Password is Incorrect')
+
 def connect():
     global cnx
     global cursor
     cnx = mysql.connector.connect(
         host='localhost',
-        user='root',
-        password="",
-        port='3306',
+        user=username,
+        password=password,
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
     )
@@ -526,7 +536,7 @@ def race_results_page():
     if not is_connected():
         connect()
     ui.page_title('View Results')
-    ui.label('Choose Race to View')
+    ui.label('Choose Records to View')
     races = {}
     rid = {}
     cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
@@ -558,20 +568,80 @@ def race_results_page():
         ####this is filtering by athlete, need query with more info#####
         #### change for loop and header names####
         
-        race_query = ('Query for all results for the chosen athlete')
-        race_params = (rid[race_choice.value][0], rid[race_choice.value][1])
-        cursor.execute(race_query, race_params)
+        athlete_query = '''WITH results AS(
+                        SELECT
+                            legresults.AthleteID,
+                            legresults.RaceName,
+                            legresults.RaceDate,
+                            race.Type,
+                            MAX(CASE WHEN legresults.LegName = 'swim' THEN legresults.Time ELSE 0 END) AS "swim_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T1' THEN transitionresults.Time ELSE 0 END) AS "t1_time",
+                            MAX(CASE WHEN legresults.LegName = 'bike' THEN legresults.Time ELSE 0 END) AS "bike_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T2' THEN transitionresults.Time ELSE 0 END) AS "t2_time",
+                            MAX(CASE WHEN legresults.LegName = 'run' THEN legresults.Time ELSE 0 END) AS "run_time",
+                            MAX(raceresults.TimeTotal) AS "total_time"
+                            FROM legresults
+                            LEFT JOIN transitionresults
+                            ON legresults.AthleteID = transitionresults.AthleteID AND
+                                legresults.RaceName = transitionresults.RaceName AND
+                                legresults.RaceDate = transitionresults.RaceDate
+                            LEFT JOIN raceresults
+                            ON legresults.AthleteID = raceresults.AthleteID AND
+                                legresults.RaceName = raceresults.RaceName AND
+                                legresults.RaceDate = raceresults.RaceDate
+                            LEFT JOIN race
+                            ON legresults.RaceName = race.RaceName AND
+                                legresults.RaceDate = race.RaceDate
+                            GROUP BY AthleteID, RaceName, RaceDate
+                    )
+                    SELECT 
+                        athlete.LastName,
+                        athlete.FirstName,
+                        results.RaceName,
+                        results.RaceDate,
+                        results.Type,
+                        results.swim_time,
+                        results.t1_time,
+                        results.bike_time,
+                        results.t2_time,
+                        results.run_time,
+                        results.total_time
+                    FROM athlete
+                    LEFT JOIN results
+                    ON athlete.AthleteID = results.AthleteID
+                    WHERE results.RaceName IS NOT NULL AND athlete.AthleteID = (%s)
+                    ORDER BY results.RaceDate DESC'''
+        
+        cursor.execute(athlete_query, (athlete_choice.value,))
         results = []
-        for '''race name and stats''' in cursor:
+        for ln, fn, rn, rd, type, st, t1, bt, t2, rt, tt in cursor:
             result = {
-                #race name and stats as keys
+            "Last Name": ln,
+            "First Name": fn,
+            "Race Name": rn,
+            "Race Date": rd,
+            "Type": type,
+            "Swim Time": get_timestring(st),
+            "T1 Time": get_timestring(t1),
+            "Bike Time": get_timestring(bt),
+            "T2 Time": get_timestring(t2),
+            "Run Time": get_timestring(rt),
+            "Total Time": get_timestring(tt)
             }
             results.append(result)
         #rename headers for info we're getting about athlete's results
         grid.options['columnDefs'] = [
-                                {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-                                {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-                                {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+            {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'Race Name', 'field': 'Race Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'Race Date', 'field': 'Race Date', 'filter': 'agDateColumnFilter'},
+            {'headerName': 'Race Distance', 'field': 'Type', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'Swim Time', 'field': 'Swim Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'T1 Time', 'field': 'T1 Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Bike Time', 'field': 'Bike Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'T2 Time', 'field': 'T2 Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Run Time', 'field': 'Run Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter'}
         ]
         grid.options['rowData'] = results
 
@@ -587,23 +657,72 @@ def race_results_page():
         ####this is filtering by race, need query with more info#####
         #### change for loop and header names####
         
-        race_query = ('SELECT athlete.FirstName, athlete.LastName, raceresults.TimeTotal FROM athlete LEFT JOIN raceresults ' + 
-                      'ON raceresults.AthleteID = athlete.AthleteID WHERE raceresults.RaceName LIKE(%s) AND raceresults.RaceDate ' +
-                      '= %s ORDER BY athlete.LastName ASC')
+        race_query = ('''WITH results AS(
+                        SELECT
+                            legresults.AthleteID,
+                            legresults.RaceName,
+                            legresults.RaceDate,
+                            MAX(CASE WHEN legresults.LegName = 'swim' THEN legresults.Time ELSE 0 END) AS "swim_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T1' THEN transitionresults.Time ELSE 0 END) AS "t1_time",
+                            MAX(CASE WHEN legresults.LegName = 'bike' THEN legresults.Time ELSE 0 END) AS "bike_time",
+                            MAX(CASE WHEN transitionresults.TName = 'T2' THEN transitionresults.Time ELSE 0 END) AS "t2_time",
+                            MAX(CASE WHEN legresults.LegName = 'run' THEN legresults.Time ELSE 0 END) AS "run_time",
+                            MAX(raceresults.TimeTotal) AS "total_time"
+                            FROM legresults
+                            LEFT JOIN transitionresults
+                            ON legresults.AthleteID = transitionresults.AthleteID AND
+                                legresults.RaceName = transitionresults.RaceName AND
+                                legresults.RaceDate = transitionresults.RaceDate
+                            LEFT JOIN raceresults
+                            ON legresults.AthleteID = raceresults.AthleteID AND
+                                legresults.RaceName = raceresults.RaceName AND
+                                legresults.RaceDate = raceresults.RaceDate
+                            GROUP BY AthleteID, RaceName, RaceDate
+                    )
+                    SELECT 
+                        athlete.LastName,
+                        athlete.FirstName,
+                        results.RaceName,
+                        results.RaceDate,
+                        results.swim_time,
+                        results.t1_time,
+                        results.bike_time,
+                        results.t2_time,
+                        results.run_time,
+                        results.total_time
+                    FROM athlete
+                    LEFT JOIN results
+                    ON athlete.AthleteID = results.AthleteID
+                    WHERE results.RaceName LIKE(%s) AND results.RaceDate = (%s)
+                    ORDER BY results.total_time ASC''')
         race_params = (rid[race_choice.value][0], rid[race_choice.value][1])
         cursor.execute(race_query, race_params)
         results = []
-        for fn, ln, tt in cursor:
+        for ln, fn, rn, rd, st, t1, bt, t2, rt, tt in cursor:
             result = {
-                "First Name": fn,
                 "Last Name": ln,
-                "Total Time": tt
+                "First Name": fn,
+                "Race Name": rn,
+                "Race Date": rd,
+                "Swim Time": get_timestring(st),
+                "T1 Time": get_timestring(t1),
+                "Bike Time": get_timestring(bt),
+                "T2 Time": get_timestring(t2),
+                "Run Time": get_timestring(rt),
+                "Total Time": get_timestring(tt)
             }
             results.append(result)
         grid.options['columnDefs'] = [
-                                {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-                                {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter', 'floatingFilter': True},
-                                {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter', 'floatingFilter': True}
+            {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'Race Name', 'field': 'Race Name', 'filter': 'agTextColumnFilter'},
+            {'headerName': 'Race Date', 'field': 'Race Date', 'filter': 'agDateColumnFilter'},
+            {'headerName': 'Swim Time', 'field': 'Swim Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'T1 Time', 'field': 'T1 Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Bike Time', 'field': 'Bike Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'T2 Time', 'field': 'T2 Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Run Time', 'field': 'Run Time', 'filter': 'agNumberColumnFilter'},
+            {'headerName': 'Total Time', 'field': 'Total Time', 'filter': 'agNumberColumnFilter'}
         ]
         grid.options['rowData'] = results
 
@@ -623,16 +742,7 @@ def all_results_page():
         connect()
     ui.page_title('All Results')
     ui.label('All Results')
-    races = {}
-    rid = {}
-    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
-    for (rn, rd) in cursor:
-        r_id = get_id(10)
-        races[r_id] = (rn + ", " + str(rd))
-        rid[r_id] = [rn, rd]
-    race_choice = ui.select(options= races, label='Choose Race', with_input=True)
-    button = ui.button('Submit')
-    ### maybe just modify this for filter_athlete query ###
+
     cursor.execute('''WITH results AS(
                         SELECT
                             legresults.AthleteID,
@@ -704,18 +814,32 @@ def all_results_page():
     ui.run()
 
 #################################################
+@ui.page('/home')
+def homepage():
+    ui.page_title('Multisport Metrics')
+    with ui.card():
+        ui.label('Insert')
+        ui.link('Insert Athlete', ins_athlete_page)
+        ui.link('Insert Race', ins_race_page)
+        ui.link('Insert Race Results', ins_results_page)
+    with ui.card():
+        ui.label('Update')
+        ui.link('Update Athlete', upd_athlete_page)
+        ui.link('Update Race', upd_race_page)
+    with ui.card():
+        ui.label('Delete')
+        ui.link('Delete Athlete', del_athlete_page)
+        ui.link('Delete Race', del_race_page)
+        ui.link('Delete Race Results', del_results_page)
+    with ui.card():
+        ui.label('View Results')
+        ui.link('View Race Results', race_results_page)
+        ui.link('All Results', all_results_page)
 
-ui.link('Insert Athlete', ins_athlete_page)
-ui.link('Insert Race', ins_race_page)
-ui.link('Insert Race Results', ins_results_page)
+ui.label("Welcome to Multisport Metrics")
+with ui.card():
+    un = ui.input(label='Username')
+    pw = ui.input(label='Password', password=True)
+    button = ui.button('Log In', on_click=lambda: login(un.value, pw.value))
 
-ui.link('Update Athlete', upd_athlete_page)
-ui.link('Update Race', upd_race_page)
-
-ui.link('Delete Athlete', del_athlete_page)
-ui.link('Delete Race', del_race_page)
-ui.link('Delete Race Results', del_results_page)
-ui.link('View Race Results', race_results_page)
-
-ui.link('All Results', all_results_page)
-ui.run()
+ui.run(title="Multisport Metrics", favicon='🚀')
