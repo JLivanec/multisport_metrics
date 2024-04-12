@@ -820,8 +820,6 @@ def records_page():
     if not is_connected():
         connect()
     ui.page_title('Records')
-    ui.label('Records')
-
     cursor.execute('''
         WITH oly AS(
         SELECT
@@ -843,19 +841,23 @@ def records_page():
         oly.LastName,
         oly.Time,
         oly.Sex,
-        oly.LegName
+        oly.LegName,
+        oly.RaceDate,
+        oly.RaceName
         FROM oly
         JOIN (SELECT MIN(Time) AS time FROM oly WHERE Time != 0 GROUP BY Sex, LegName) min
             ON oly.Time = min.time
         ORDER BY Sex ASC, LegName ASC; ''')
     womens_records = []
     mens_records = []
-    for fn, ln, time, sex, legname in cursor:
+    for fn, ln, time, sex, legname, rd, rn in cursor:
         record = {
             "Name": (fn + " " + ln),
             "Time" : get_timestring(time),
             "Sex" : sex,
-            "Leg" : ("Olympic " + legname)
+            "Leg" : ("Olympic " + legname),
+            "Race Date" : rd,
+            "Race Name" : rn
         }
         if sex == "F":
             womens_records.append(record)
@@ -868,47 +870,68 @@ def records_page():
         LastName,
         total_time,
         Sex,
-        Type
+        Type,
+        RaceDate,
+        RaceName
         FROM aggregated_results
         JOIN (SELECT MIN(total_time) AS time FROM aggregated_results WHERE total_time != 0 AND Type LIKE("olympic") GROUP BY Sex) min
             ON total_time = min.time
         ORDER BY Sex ASC;
                    ''')
     overall_records = []
-    for fn, ln, time, sex, ty in cursor:
+    for fn, ln, time, sex, ty, rd, rn in cursor:
         record = {
             "Name": (fn + " " + ln),
             "Time" : get_timestring(time),
-            "Sex" : sex
+            "Sex" : sex,
+            "Race Date" : rd,
+            "Race Name" : rn
         }
         overall_records.append(record)
-    with ui.card():
-        ui.label("Women's Individual Records")
-        columns = [
-            {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
-            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
-            {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True}
-        ]
-        rows = womens_records
-        ui.table(columns=columns, rows=rows, row_key='name')
-    with ui.card():
-        ui.label("Men's Individual Records")
-        columns = [
-            {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
-            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
-            {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True}
-        ]
-        rows = mens_records
-        ui.table(columns=columns, rows=rows, row_key='name')
-    with ui.card():
-        ui.label("Overall Records")
-        columns = [
-            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True},
-            {'name': 'Time', 'label': 'Time', 'field': 'Time', 'required': True, 'align': 'left'},
-            {'name': 'Sex', 'label': 'Sex', 'field':'Sex', 'required':True}
-        ]
-        rows = overall_records
-        ui.table(columns=columns, rows=rows, row_key='name')    
+
+    with ui.tabs().classes('w-full') as tabs:
+        one = ui.tab("Men's Individual")
+        two = ui.tab("Women's Individual")
+        thre = ui.tab('Overall')
+    with ui.tab_panels(tabs, value=two).classes('w-full'):
+        with ui.tab_panel(one):
+            with ui.card():
+                ui.label("Men's Individual Records")
+                columns = [
+                    {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
+                    {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
+                    {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True},
+                    {'name': 'Race Date', 'label': 'Date', 'field' : 'Race Date', 'required':True},
+                    {'name': 'Race Name', 'label': 'Race', 'field' : 'Race Name', 'required':True}
+                ]
+                rows = mens_records
+                ui.table(columns=columns, rows=rows, row_key='name')
+        with ui.tab_panel(two):
+            with ui.card():
+                ui.label("Women's Individual Records")
+                columns = [
+                    {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
+                    {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
+                    {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True},
+                    {'name': 'Race Date', 'label': 'Date', 'field' : 'Race Date', 'required':True},
+                    {'name': 'Race Name', 'label': 'Race', 'field' : 'Race Name', 'required':True}
+
+                ]
+                rows = womens_records
+                ui.table(columns=columns, rows=rows, row_key='name')
+        with ui.tab_panel(thre):
+            with ui.card():
+                ui.label("Overall Records")
+                columns = [
+                    {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True},
+                    {'name': 'Time', 'label': 'Time', 'field': 'Time', 'required': True, 'align': 'left'},
+                    {'name': 'Sex', 'label': 'Sex', 'field':'Sex', 'required':True},
+                    {'name': 'Race Date', 'label': 'Date', 'field' : 'Race Date', 'required':True},
+                    {'name': 'Race Name', 'label': 'Race', 'field' : 'Race Name', 'required':True}
+                ]
+                rows = overall_records
+                ui.table(columns=columns, rows=rows, row_key='name')  
+  
     ui.run()
 
 
