@@ -3,6 +3,7 @@ import mysql.connector
 from nicegui.events import ValueChangeEventArguments
 import random as rand
 from datetime import date, datetime, timedelta
+import pandas as pd
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
 def get_id(size):
@@ -813,6 +814,104 @@ def all_results_page():
     }).classes('min-h-screen')
     ui.run()
 
+@ui.page('/records')
+def records_page():
+    
+    if not is_connected():
+        connect()
+    ui.page_title('Records')
+    ui.label('Records')
+
+    cursor.execute('''
+        WITH oly AS(
+        SELECT
+        a.LastName,
+        a.FirstName,
+        a.raceName,
+        a.raceDate,
+        a.Time,
+        a.LegName,
+        a.Sex,
+        r.Type
+        FROM all_legs as a
+        LEFT JOIN race r
+        ON a.RaceName = r.RaceName AND
+        a.RaceDate = r.RaceDate
+        WHERE Type LIKE("olympic"))
+        SELECT
+        oly.FirstName,
+        oly.LastName,
+        oly.Time,
+        oly.Sex,
+        oly.LegName
+        FROM oly
+        JOIN (SELECT MIN(Time) AS time FROM oly WHERE Time != 0 GROUP BY Sex, LegName) min
+            ON oly.Time = min.time
+        ORDER BY Sex ASC, LegName ASC; ''')
+    womens_records = []
+    mens_records = []
+    for fn, ln, time, sex, legname in cursor:
+        record = {
+            "Name": (fn + " " + ln),
+            "Time" : get_timestring(time),
+            "Sex" : sex,
+            "Leg" : ("Olympic " + legname)
+        }
+        if sex == "F":
+            womens_records.append(record)
+        else:
+            mens_records.append(record)
+
+    cursor.execute('''
+        SELECT
+        FirstName,
+        LastName,
+        total_time,
+        Sex,
+        Type
+        FROM aggregated_results
+        JOIN (SELECT MIN(total_time) AS time FROM aggregated_results WHERE total_time != 0 AND Type LIKE("olympic") GROUP BY Sex) min
+            ON total_time = min.time
+        ORDER BY Sex ASC;
+                   ''')
+    overall_records = []
+    for fn, ln, time, sex, ty in cursor:
+        record = {
+            "Name": (fn + " " + ln),
+            "Time" : get_timestring(time),
+            "Sex" : sex
+        }
+        overall_records.append(record)
+    with ui.card():
+        ui.label("Women's Individual Records")
+        columns = [
+            {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
+            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
+            {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True}
+        ]
+        rows = womens_records
+        ui.table(columns=columns, rows=rows, row_key='name')
+    with ui.card():
+        ui.label("Men's Individual Records")
+        columns = [
+            {'name': 'Leg', 'label': 'Leg', 'field': 'Leg', 'required': True},
+            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True, 'align': 'left'},
+            {'name': 'Time', 'label': 'Time', 'field':'Time', 'required':True}
+        ]
+        rows = mens_records
+        ui.table(columns=columns, rows=rows, row_key='name')
+    with ui.card():
+        ui.label("Overall Records")
+        columns = [
+            {'name': 'Name', 'label': 'Name', 'field': 'Name', 'required': True},
+            {'name': 'Time', 'label': 'Time', 'field': 'Time', 'required': True, 'align': 'left'},
+            {'name': 'Sex', 'label': 'Sex', 'field':'Sex', 'required':True}
+        ]
+        rows = overall_records
+        ui.table(columns=columns, rows=rows, row_key='name')    
+    ui.run()
+
+
 #################################################
 @ui.page('/home')
 def homepage():
@@ -835,6 +934,7 @@ def homepage():
         ui.label('View Results')
         ui.link('View Race Results', race_results_page)
         ui.link('All Results', all_results_page)
+        ui.link('Records', records_page)
 
 ui.label("Welcome to Multisport Metrics")
 with ui.card():
