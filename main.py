@@ -868,7 +868,7 @@ def records_page():
         one = ui.tab("Men's Individual")
         two = ui.tab("Women's Individual")
         thre = ui.tab('Overall')
-    with ui.tab_panels(tabs, value=two).classes('w-full'):
+    with ui.tab_panels(tabs, value=thre).classes('w-full'):
         with ui.tab_panel(one):
             with ui.card():
                 ui.label("Men's Individual Records")
@@ -958,42 +958,153 @@ def stats_page():
             'Run Time': rts,
             'Total Time': tts}
     df = pd.DataFrame(data)
+    sprints = df[df['Type'] == "sprint"]
+    olys = df[df['Type'] == "olympic"]
+    hims = df[df['Type'] == "half ironman"]
 
     swim_times = [time for time in df['Swim Time'] if time > 0 and time < 10000]
+    swim_sprint = [time for time in sprints['Swim Time'] if time > 0 and time < 10000]
+    swim_oly = [time for time in olys['Swim Time'] if time > 0 and time < 10000]
+    swim_him = [time for time in hims['Swim Time'] if time > 0 and time < 10000]
+
     t1_times = [time for time in df['T1 Time'] if time > 0 and time < 1000]
+    t1_sprint = [time for time in sprints['T1 Time'] if time > 0 and time < 1000]
+    t1_oly = [time for time in olys['T1 Time'] if time > 0 and time < 1000]
+    t1_him = [time for time in hims['T1 Time'] if time > 0 and time < 1000]
+
     bike_times = [time for time in df['Bike Time'] if time > 0 and time < 60000]
+    bike_sprint = [time for time in sprints['Bike Time'] if time > 0 and time < 60000]
+    bike_oly = [time for time in olys['Bike Time'] if time > 0 and time < 60000]
+    bike_him = [time for time in hims['Bike Time'] if time > 0 and time < 60000]
+
     t2_times = [time for time in df['T2 Time'] if time > 0 and time < 1000]
+    t2_sprint = [time for time in sprints['T2 Time'] if time > 0 and time < 1000]
+    t2_oly = [time for time in olys['T2 Time'] if time > 0 and time < 1000]
+    t2_him = [time for time in hims['T2 Time'] if time > 0 and time < 1000]
+
     run_times = [time for time in df['Run Time'] if time > 0 and time < 60000]
+    run_sprint = [time for time in sprints['Run Time'] if time > 0 and time < 60000]
+    run_oly = [time for time in olys['Run Time'] if time > 0 and time < 60000]
+    run_him = [time for time in hims['Run Time'] if time > 0 and time < 60000]
+
     total_times = [time for time in df['Total Time'] if time > 0]
+    sprint_times = [time for time in sprints['Total Time'] if time > 0]
+    oly_times = [time for time in olys['Total Time'] if time > 0]
+    run_times = [time for time in hims['Total Time'] if time > 0]
 
 
-    with ui.pyplot(figsize=(10, 6)):
-        plt.hist(swim_times, bins=20, color='skyblue', edgecolor='black')
-        plt.title('Distribution of Swim Times')
-        plt.xlabel('Swim Time (seconds)')
-        plt.grid(True)
-    with ui.pyplot(figsize=(10, 6)):
-        plt.hist(bike_times, bins=20, color='purple', edgecolor='black')
-        plt.title('Distribution of Bike Times')
-        plt.xlabel('Bike Time (seconds)')
-        plt.grid(True)
-    with ui.pyplot(figsize=(10, 6)):
-        plt.hist(run_times, bins=20, color='crimson', edgecolor='black')
-        plt.title('Distribution of Run Times')
-        plt.xlabel('Run Time (seconds)')
-        plt.grid(True)
-    with ui.pyplot(figsize=(10, 6)):
-        plt.hist(t1_times, bins=20, color='purple', edgecolor='black')
-        plt.title('Distribution of T1 Times')
-        plt.xlabel('T1 Time (seconds)')
-        plt.grid(True)
-    with ui.pyplot(figsize=(10, 6)):
-        plt.hist(t2_times, bins=20, color='lightgrey', edgecolor='black')
-        plt.title('Distribution of T2 Times')
-        plt.xlabel('T2 Time (seconds)')
-        plt.grid(True)
+    with ui.tabs().classes('w-full') as tabs:
+        one = ui.tab("Overall")
+        two = ui.tab("Sprint Distance")
+        thre = ui.tab('Olympic Distance')
+        fore = ui.tab('Half Ironman Distance')
+    with ui.tab_panels(tabs, value=one).classes('w-full'):
+        with ui.tab_panel(one):
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(swim_times, bins=20, color='skyblue', edgecolor='black')
+                plt.title('Distribution of Swim Times')
+                plt.xlabel('Swim Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(bike_times, bins=20, color='purple', edgecolor='black')
+                plt.title('Distribution of Bike Times')
+                plt.xlabel('Bike Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(run_times, bins=20, color='crimson', edgecolor='black')
+                plt.title('Distribution of Run Times')
+                plt.xlabel('Run Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t1_times, bins=20, color='purple', edgecolor='black')
+                plt.title('Distribution of T1 Times')
+                plt.xlabel('T1 Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t2_times, bins=20, color='lightgrey', edgecolor='black')
+                plt.title('Distribution of T2 Times')
+                plt.xlabel('T2 Time (seconds)')
+                plt.grid(True)
 
+        with ui.tab_panel(two):
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(swim_sprint, bins=20, color='skyblue', edgecolor='black')
+                plt.title('Sprint Swim Times')
+                plt.xlabel('Swim Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(bike_sprint, bins=20, color='purple', edgecolor='black')
+                plt.title('Sprint Bike Times')
+                plt.xlabel('Bike Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(run_sprint, bins=20, color='crimson', edgecolor='black')
+                plt.title('Sprint Run Times')
+                plt.xlabel('Run Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t1_sprint, bins=20, color='purple', edgecolor='black')
+                plt.title('Sprint T1 Times')
+                plt.xlabel('T1 Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t2_sprint, bins=20, color='lightgrey', edgecolor='black')
+                plt.title('Sprint T2 Times')
+                plt.xlabel('T2 Time (seconds)')
+                plt.grid(True) 
+        with ui.tab_panel(thre):
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(swim_oly, bins=20, color='skyblue', edgecolor='black')
+                plt.title('Olympic Swim Times')
+                plt.xlabel('Swim Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(bike_oly, bins=20, color='purple', edgecolor='black')
+                plt.title('Olympic Bike Times')
+                plt.xlabel('Bike Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(run_oly, bins=20, color='crimson', edgecolor='black')
+                plt.title('Olympic Run Times')
+                plt.xlabel('Run Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t1_oly, bins=20, color='purple', edgecolor='black')
+                plt.title('Olympic T1 Times')
+                plt.xlabel('T1 Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t2_oly, bins=20, color='lightgrey', edgecolor='black')
+                plt.title('Olympic T2 Times')
+                plt.xlabel('T2 Time (seconds)')
+                plt.grid(True) 
 
+        with ui.tab_panel(fore):
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(swim_him, bins=10, color='skyblue', edgecolor='black')
+                plt.title('Half Ironman Swim Times')
+                plt.xlabel('Swim Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(bike_him, bins=10, color='purple', edgecolor='black')
+                plt.title('Half Ironman Bike Times')
+                plt.xlabel('Bike Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(run_him, bins=10, color='crimson', edgecolor='black')
+                plt.title('Half Ironman Run Times')
+                plt.xlabel('Run Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t1_him, bins=10, color='purple', edgecolor='black')
+                plt.title('Half Ironman T1 Times')
+                plt.xlabel('T1 Time (seconds)')
+                plt.grid(True)
+            with ui.pyplot(figsize=(10, 6)):
+                plt.hist(t2_him, bins=10, color='lightgrey', edgecolor='black')
+                plt.title('Half Ironman T2 Times')
+                plt.xlabel('T2 Time (seconds)')
+                plt.grid(True) 
 
 
 #################################################
