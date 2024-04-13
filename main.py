@@ -5,6 +5,7 @@ import random as rand
 from datetime import date, datetime, timedelta
 import pandas as pd
 from pace import *
+import matplotlib.pyplot as plt
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
 def get_id(size):
@@ -908,6 +909,92 @@ def records_page():
   
     ui.run()
 
+@ui.page('/stats')
+def stats_page():
+    if not is_connected():
+        connect()
+    ui.page_title('Records')
+    ui.link('View Records', records_page)
+    cursor.execute('SELECT * FROM aggregated_results;')
+    lastnames = []
+    firstnames = []
+    aids = []
+    sexs = []
+    types = []
+    rns = []
+    rds = []
+    sts = []
+    t1s = []
+    bts = []
+    t2s = []
+    rts = []
+    tts = []
+    for ln, fn, aid, sex, type, rn, rd, st, t1, bt, t2, rt, tt in cursor:
+        lastnames.append(ln)
+        firstnames.append(fn)
+        aids.append(aid)
+        sexs.append(sex)
+        types.append(type)
+        rns.append(rn)
+        rds.append(rd)
+        sts.append(st)
+        t1s.append(t1)
+        bts.append(bt)
+        t2s.append(t2)
+        rts.append(rt)
+        tts.append(tt)
+
+    data = {'First Name': firstnames,
+            'Last Name': lastnames,
+            'Athlete ID': aids,
+            'Sex': sex,
+            'Type': types,
+            'Race Name': rns,
+            'Race Date': rds,
+            'Swim Time': sts,
+            'T1 Time': t1s,
+            'Bike Time': bts,
+            'T2 Time': t2s,
+            'Run Time': rts,
+            'Total Time': tts}
+    df = pd.DataFrame(data)
+
+    swim_times = [time for time in df['Swim Time'] if time > 0 and time < 10000]
+    t1_times = [time for time in df['T1 Time'] if time > 0 and time < 1000]
+    bike_times = [time for time in df['Bike Time'] if time > 0 and time < 60000]
+    t2_times = [time for time in df['T2 Time'] if time > 0 and time < 1000]
+    run_times = [time for time in df['Run Time'] if time > 0 and time < 60000]
+    total_times = [time for time in df['Total Time'] if time > 0]
+
+
+    with ui.pyplot(figsize=(10, 6)):
+        plt.hist(swim_times, bins=20, color='skyblue', edgecolor='black')
+        plt.title('Distribution of Swim Times')
+        plt.xlabel('Swim Time (seconds)')
+        plt.grid(True)
+    with ui.pyplot(figsize=(10, 6)):
+        plt.hist(bike_times, bins=20, color='purple', edgecolor='black')
+        plt.title('Distribution of Bike Times')
+        plt.xlabel('Bike Time (seconds)')
+        plt.grid(True)
+    with ui.pyplot(figsize=(10, 6)):
+        plt.hist(run_times, bins=20, color='crimson', edgecolor='black')
+        plt.title('Distribution of Run Times')
+        plt.xlabel('Run Time (seconds)')
+        plt.grid(True)
+    with ui.pyplot(figsize=(10, 6)):
+        plt.hist(t1_times, bins=20, color='purple', edgecolor='black')
+        plt.title('Distribution of T1 Times')
+        plt.xlabel('T1 Time (seconds)')
+        plt.grid(True)
+    with ui.pyplot(figsize=(10, 6)):
+        plt.hist(t2_times, bins=20, color='lightgrey', edgecolor='black')
+        plt.title('Distribution of T2 Times')
+        plt.xlabel('T2 Time (seconds)')
+        plt.grid(True)
+
+
+
 
 #################################################
 @ui.page('/home')
@@ -932,6 +1019,7 @@ def homepage():
         ui.link('View Race Results', race_results_page)
         ui.link('All Results', all_results_page)
         ui.link('Records', records_page)
+        ui.link('Statistics', stats_page)
 
 ui.label("Welcome to Multisport Metrics")
 with ui.card():
