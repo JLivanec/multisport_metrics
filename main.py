@@ -4,6 +4,7 @@ from nicegui.events import ValueChangeEventArguments
 import random as rand
 from datetime import date, datetime, timedelta
 import pandas as pd
+from pace import *
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
 def get_id(size):
@@ -112,12 +113,9 @@ def insert_athlete(fn, ln, grad, home, sex, dob):
 
     cnx.commit()
     ui.notify("Athlete {0}, {1} has been added and assigned AthleteID {2}".format(ln, fn, a_id))
-    #return to homepage
     return None
 
 def insert_race(rn, city, state, type, rdate, s_dist, s_type, b_dist, b_elev, r_dist, r_elev):
-    # check validity
-
     race_info = {'RaceName' : rn, 'City' : city, 'State' : state, 'Type' : type, 'RaceDate' : rdate}
     add_race = ("INSERT INTO race"
                    "(RaceName, City, State, Type, RaceDate)"
@@ -136,7 +134,6 @@ def insert_race(rn, city, state, type, rdate, s_dist, s_type, b_dist, b_elev, r_
     cursor.execute(add_leg, run_info)
     cnx.commit()
     ui.notify("Race {0} Added".format(rn))
-    #return to homepage
     return None
 
 def update_race(rn, city, state, type, rdate, s_dist, s_type, b_dist, b_elev, r_dist, r_elev):
@@ -285,12 +282,6 @@ def upd_athlete_page():
         athletes[a_id] = (ln + ", " + fn)
     
     upd_athlete = ui.select(options= athletes, label='Choose Athlete', with_input=True, on_change=lambda : get_athlete_info(upd_athlete.value))#.bind_value_to(globals(), 'result')
-    # here, we need to add an 'on_change' parameter calling a function to query the specific athlete based on id (the binding 
-    # should always update result any time the selection is changed)
-    
-    #ui.button('Delete', color='red', on_click = lambda: remove_athlete(upd_athlete.value, athletes))
-    #update = ui.button('Edit', color='green', on_click = None)
-
     fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
     ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
     grad_input = ui.number(label='Graduation Year', placeholder='e.g. 2024', min=1000, max=9999, 
@@ -335,7 +326,6 @@ def ins_race_page():
     
     ui.label('Swim Leg')
     swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
-    # feel free to change defaults for open swim as well as the placeholder for all of these
     ui.label('Type of Swim')
     open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
 
@@ -370,7 +360,7 @@ def del_race_page():
         rid[r_id] = [rn, rd]
 
     #result = 0
-    del_race = ui.select(options= races, label='Choose Race', with_input=True)#.bind_value_to(globals(), 'result')
+    del_race = ui.select(options= races, label='Choose Race', with_input=True)
     
     ui.button('Delete', color='red', on_click = lambda: remove_race(rid[del_race.value][0], rid[del_race.value][1]))
 
@@ -411,7 +401,6 @@ def upd_race_page():
     
     ui.label('Swim Leg')
     swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
-    # feel free to change defaults for open swim as well as the placeholder for all of these
     ui.label('Type of Swim')
     open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
 
@@ -561,14 +550,7 @@ def race_results_page():
         'rowData': []
     }).classes('min-h-screen')
 
-    ####possibly a way to specify an a specific race for a specific athlete####
-
-
-
-    def filter_athlete():
-        ####this is filtering by athlete, need query with more info#####
-        #### change for loop and header names####
-        
+    def filter_athlete():        
         athlete_query = '''WITH results AS(
                         SELECT
                             legresults.AthleteID,
@@ -630,7 +612,7 @@ def race_results_page():
             "Total Time": get_timestring(tt)
             }
             results.append(result)
-        #rename headers for info we're getting about athlete's results
+
         grid.options['columnDefs'] = [
             {'headerName': 'Last Name', 'field': 'Last Name', 'filter': 'agTextColumnFilter'},
             {'headerName': 'First Name', 'field': 'First Name', 'filter': 'agTextColumnFilter'},
@@ -649,15 +631,10 @@ def race_results_page():
         grid.update()
     
     athlete_button.on('click',filter_athlete)
-    #button = ui.button('Submit', on_click=filter_grid)
-
     ui.run()
 
 
-    def filter_race():
-        ####this is filtering by race, need query with more info#####
-        #### change for loop and header names####
-        
+    def filter_race(): 
         race_query = ('''WITH results AS(
                         SELECT
                             legresults.AthleteID,
@@ -730,9 +707,6 @@ def race_results_page():
         grid.update()
     race_button.on('click',filter_race)
     athlete_button.on('click',filter_athlete)
-
-    #button = ui.button('Submit', on_click=filter_grid)
-
     ui.run()
 
 
