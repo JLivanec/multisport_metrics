@@ -281,3 +281,16 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2024-04-12 18:46:34
+DROP TABLE IF EXISTS users;
+
+CREATE TABLE users (
+  FirstName varchar(30) NOT NULL,
+  LastName varchar(30) NOT NULL,
+  username varchar(30) NOT NULL,
+  password varchar(100) NOT NULL,
+  email varchar(30) NOT NULL,
+  role enum('basic', 'admin') NOT NULL,
+  PRIMARY KEY (username)
+);
+
+Insert into users values ('John', 'Smith', 'jsmith', '$2b$12$GyR33fvI995RFejU7HV5MuPcELsgmM65Bq0ocyuExwxFsS6EE/poa', 'jsmith@gmail.com', 'admin');
