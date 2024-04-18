@@ -10,4 +10,8 @@
 [Ss]cripts
 pyvenv.cfg
 .venv
+.nicegui
+.env
+__pycache__/
+**/.DS_Store
 pip-selfcheck.json
