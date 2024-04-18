@@ -1,4 +1,16 @@
-from nicegui import ui
+"""This is just a simple authentication example.
+
+Please see the `OAuth2 example at FastAPI <https://fastapi.tiangolo.com/tutorial/security/simple-oauth2/>`_  or
+use the great `Authlib package <https://docs.authlib.org/en/v0.13/client/starlette.html#using-fastapi>`_ to implement a classing real authentication system.
+Here we just demonstrate the NiceGUI integration.
+"""
+from typing import Optional
+
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from nicegui import Client, app, ui
 import mysql.connector
 from nicegui.events import ValueChangeEventArguments
 import random as rand
@@ -8,27 +20,38 @@ from pace import *
 import matplotlib.pyplot as plt
 state_names = ["Alaska", "Alabama", "Arkansas", "American Samoa", "Arizona", "California", "Colorado", "Connecticut", "District ", "of Columbia", "Delaware", "Florida", "Georgia", "Guam", "Hawaii", "Iowa", "Idaho", "Illinois", "Indiana", "Kansas", "Kentucky", "Louisiana", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "Montana", "North Carolina", "North Dakota", "Nebraska", "New Hampshire", "New Jersey", "New Mexico", "Nevada", "New York", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Virginia", "Virgin Islands", "Vermont", "Washington", "Wisconsin", "West Virginia", "Wyoming"]
 
+
+# in reality users passwords would obviously need to be hashed
+users = {'user1':{'password': 'pass1', 'role': 'admin'}, 'user2':{'password': 'pass2', 'role': 'admin'}, 'user3':{'password': 'pass3', 'role': 'basic'}}
+
+unrestricted_page_routes = {'/login', '/create-account'}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """This middleware restricts access to all NiceGUI pages.
+
+    It redirects the user to the login page if they are not authenticated.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if not app.storage.user.get('authenticated', False):
+            if request.url.path in Client.page_routes.values() and request.url.path not in unrestricted_page_routes:
+                app.storage.user['referrer_path'] = request.url.path  # remember where the user wanted to go
+                return RedirectResponse('/login')
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
 def get_id(size):
     return ''.join(["{}".format(rand.randint(0, 9)) for _ in range(0, size)])
-
-def login(un, pw):
-    global username
-    global password
-    username=un
-    password=pw
-    connect()
-    if is_connected():
-        ui.open(homepage)
-    else:
-        ui.notify('Username or Password is Incorrect')
 
 def connect():
     global cnx
     global cursor
     cnx = mysql.connector.connect(
         host='localhost',
-        user=username,
-        password=password,
+        user='root',
+        password='',
         database='multisport_metrics',
         auth_plugin='mysql_native_password'
     )
@@ -227,303 +250,348 @@ def remove_race_results(rname, rdate, a_id):
     cnx.commit()
     return None
 
+'''
+@ui.page('/')
+def main_page() -> None:
+    with ui.column().classes('absolute-center items-center'):
+        ui.label(f'Hello {app.storage.user["username"]}!').classes('text-2xl')
+        ui.label(f'Your role is {app.storage.user["role"]}!').classes('text-2xl')
+        ui.button(on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login')), icon='logout') \
+            .props('outline round')
+'''
+
+def add_common_header():
+    with ui.header().classes('flex justify-between items-center p-4 bg-blue-500 text-white'):
+        ui.label('Multisport Metrics').classes('text-xl')
+        if app.storage.user.get('authenticated', False):
+            ui.button(icon= 'logout', text='Logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes('btn btn-warning')
+            ui.button('Account Details', on_click=lambda: ui.navigate.to('/account'))
+            if app.storage.user['role'] == 'admin':
+                with ui.button(text='Admin Tools'):
+                    with ui.menu():
+                        ui.menu_item('Create New User', on_click=lambda: ui.navigate.to('/create-account'))
+                        ui.menu_item('Edit Users', on_click=lambda: ui.navigate.to('/edit-users'))
+
 #insert athlete
 @ui.page('/ins_athlete_page')
 def ins_athlete_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Insert Athlete')
-    ui.label('Input Athlete Info')
-    fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
-    ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
-    grad_input = ui.number(label='Graduation Year', placeholder='e.g. 2024', min=1000, max=9999, 
-                           precision=0, validation={'Please enter valid year': lambda value: value > 999 and value < 10000}).props('width=80')
-    home_input = ui.input(label='Hometown', placeholder='e.g. Blacksburg, VA', validation={'Input too long': lambda value: len(value) <= 20})
-    ui.label('Sex')
-    sex_input = ui.toggle({'M': 'Male', 'F': 'Female', 'O': 'Other'}, value='M')
-    with ui.input('Date of Birth') as date:
-        with date.add_slot('append'):
-            ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
-        with ui.menu() as menu:
-            ui.date().bind_value(date)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Insert Athlete')
+        ui.label('Input Athlete Info')
+        fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
+        ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
+        grad_input = ui.number(label='Graduation Year', placeholder='e.g. 2024', min=1000, max=9999, 
+                            precision=0, validation={'Please enter valid year': lambda value: value > 999 and value < 10000}).props('width=80')
+        home_input = ui.input(label='Hometown', placeholder='e.g. Blacksburg, VA', validation={'Input too long': lambda value: len(value) <= 20})
+        ui.label('Sex')
+        sex_input = ui.toggle({'M': 'Male', 'F': 'Female', 'O': 'Other'}, value='M')
+        with ui.input('Date of Birth') as date:
+            with date.add_slot('append'):
+                ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
+            with ui.menu() as menu:
+                ui.date().bind_value(date)
 
-    ui.button('Submit', on_click = lambda: insert_athlete(fn_input.value, ln_input.value, grad_input.value, home_input.value, sex_input.value, date.value))
+        ui.button('Submit', on_click = lambda: insert_athlete(fn_input.value, ln_input.value, grad_input.value, home_input.value, sex_input.value, date.value))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
-    
 #delete athlete
 @ui.page('/del_athlete_page')
 def del_athlete_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Delete Athlete')
-    ui.label('Choose Athlete to Delete')
-    athletes = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        athletes[a_id] = (ln + ", " + fn)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Delete Athlete')
+        ui.label('Choose Athlete to Delete')
+        athletes = {}
+        cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
+        for (a_id, fn, ln) in cursor:
+            athletes[a_id] = (ln + ", " + fn)
 
-    
-    del_athlete = ui.select(options= athletes, label='Choose Athlete', with_input=True)#.bind_value_to(globals(), 'result')
-    
-    ui.button('Delete', color='red', on_click = lambda: remove_athlete(del_athlete.value, athletes))
+        
+        del_athlete = ui.select(options= athletes, label='Choose Athlete', with_input=True)#.bind_value_to(globals(), 'result')
+        
+        ui.button('Delete', color='red', on_click = lambda: remove_athlete(del_athlete.value, athletes))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
-    
+
 #update athlete
 @ui.page('/upd_athlete_page')
 def upd_athlete_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Update Athlete')
-    ui.label('Choose Athlete to Update')
-    athletes = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        athletes[a_id] = (ln + ", " + fn)
-    
-    upd_athlete = ui.select(options= athletes, label='Choose Athlete', with_input=True, on_change=lambda : get_athlete_info(upd_athlete.value))#.bind_value_to(globals(), 'result')
-    fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
-    ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
-    grad_input = ui.number(label='Graduation Year', placeholder='e.g. 2024', min=1000, max=9999, 
-                           precision=0, validation={'Please enter valid year': lambda value: value > 999 and value < 10000})
-    home_input = ui.input(label='Hometown', placeholder='e.g. Blacksburg, VA', validation={'Input too long': lambda value: len(value) <= 20})
-    ui.label('Sex')
-    sex_input = ui.toggle({'M': 'Male', 'F': 'Female', 'O': 'Other'}, value='M')
-    with ui.input('Date of Birth') as date:
-        with date.add_slot('append'):
-            ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
-        with ui.menu() as menu:
-            ui.date().bind_value(date)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Update Athlete')
+        ui.label('Choose Athlete to Update')
+        athletes = {}
+        cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
+        for (a_id, fn, ln) in cursor:
+            athletes[a_id] = (ln + ", " + fn)
+        
+        upd_athlete = ui.select(options= athletes, label='Choose Athlete', with_input=True, on_change=lambda : get_athlete_info(upd_athlete.value))#.bind_value_to(globals(), 'result')
+        fn_input = ui.input(label='First Name', placeholder='e.g. John', validation={'Input too long': lambda value: len(value) <= 20})
+        ln_input = ui.input(label='Last Name', placeholder='e.g. Smith', validation={'Input too long': lambda value: len(value) <= 20})
+        grad_input = ui.number(label='Graduation Year', placeholder='e.g. 2024', min=1000, max=9999, 
+                            precision=0, validation={'Please enter valid year': lambda value: value > 999 and value < 10000})
+        home_input = ui.input(label='Hometown', placeholder='e.g. Blacksburg, VA', validation={'Input too long': lambda value: len(value) <= 20})
+        ui.label('Sex')
+        sex_input = ui.toggle({'M': 'Male', 'F': 'Female', 'O': 'Other'}, value='M')
+        with ui.input('Date of Birth') as date:
+            with date.add_slot('append'):
+                ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
+            with ui.menu() as menu:
+                ui.date().bind_value(date)
 
-    ui.button('Confirm Changes', color='green', on_click = lambda: update_athlete(upd_athlete.value, fn_input.value,
+        ui.button('Confirm Changes', color='green', on_click = lambda: update_athlete(upd_athlete.value, fn_input.value,
                                                                                 ln_input.value, grad_input.value, home_input.value,
                                                                                 sex_input.value, date.value))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
 #insert race with legs
 @ui.page('/ins_race_page')
 def ins_race_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Insert Race')
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Insert Race')
 
-    with ui.row():
-        ui.link('Insert Athlete', ins_athlete_page)
-        ui.link('Insert Race', ins_race_page)
+        with ui.row():
+            ui.link('Insert Athlete', ins_athlete_page)
+            ui.link('Insert Race', ins_race_page)
 
-    ui.label('Input Race Info')
-    name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 90})
-    city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
-    state = ui.select(options= state_names, label='Choose State', with_input=True)
-    ui.label('Race Type')
-    r_type = ui.toggle(['sprint','olympic','half ironman','ironman','other'], value='olympic')
-    
-    with ui.input('Date of Race') as date:
-        with date.add_slot('append'):
-            ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
-        with ui.menu() as menu:
-            ui.date().bind_value(date)
-    
-    ui.label('Swim Leg')
-    swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Type of Swim')
-    open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
+        ui.label('Input Race Info')
+        name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 90})
+        city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
+        state = ui.select(options= state_names, label='Choose State', with_input=True)
+        ui.label('Race Type')
+        r_type = ui.toggle(['sprint','olympic','half ironman','ironman','other'], value='olympic')
+        
+        with ui.input('Date of Race') as date:
+            with date.add_slot('append'):
+                ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
+            with ui.menu() as menu:
+                ui.date().bind_value(date)
+        
+        ui.label('Swim Leg')
+        swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Type of Swim')
+        open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
 
-    ui.label('Bike Leg')
-    bike_dist = ui.input(label='Bike Distance in Miles', placeholder='e.g. 24.8', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Bike Elevation')
-    bike_elev = ui.input(label='Bike Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
+        ui.label('Bike Leg')
+        bike_dist = ui.input(label='Bike Distance in Miles', placeholder='e.g. 24.8', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Bike Elevation')
+        bike_elev = ui.input(label='Bike Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    ui.label('Run Leg')
-    run_dist = ui.input(label='Run Distance', placeholder='e.g. 6.2', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Run Elevation')
-    run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
+        ui.label('Run Leg')
+        run_dist = ui.input(label='Run Distance', placeholder='e.g. 6.2', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Run Elevation')
+        run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    ui.button('Submit', on_click = lambda:insert_race(name_input.value, city.value, state.value, r_type.value, date.value, swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
+        ui.button('Submit', on_click = lambda:insert_race(name_input.value, city.value, state.value, r_type.value, date.value, swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
-    
-    
 #delete race
 @ui.page('/del_race_page')
 def del_race_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Delete Race')
-    ui.label('Choose Race to Delete')
-    races = {}
-    rid = {}
-    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
-    for (rn, rd) in cursor:
-        r_id = get_id(10)
-        races[r_id] = (rn + ", " + str(rd))
-        rid[r_id] = [rn, rd]
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Delete Race')
+        ui.label('Choose Race to Delete')
+        races = {}
+        rid = {}
+        cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+        for (rn, rd) in cursor:
+            r_id = get_id(10)
+            races[r_id] = (rn + ", " + str(rd))
+            rid[r_id] = [rn, rd]
 
-    #result = 0
-    del_race = ui.select(options= races, label='Choose Race', with_input=True)
-    
-    ui.button('Delete', color='red', on_click = lambda: remove_race(rid[del_race.value][0], rid[del_race.value][1]))
+        #result = 0
+        del_race = ui.select(options= races, label='Choose Race', with_input=True)
+        
+        ui.button('Delete', color='red', on_click = lambda: remove_race(rid[del_race.value][0], rid[del_race.value][1]))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
-    
 #update race with legs
 @ui.page('/upd_race_page')
 def upd_race_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Update Race')
-    ui.label('Choose Race to Update')
-    races = {}
-    rid = {}
-    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
-    for (rn, rd) in cursor:
-        r_id = get_id(10)
-        races[r_id] = (rn + ", " + str(rd))
-        rid[r_id] = [rn, rd]
-    
-    upd_race = ui.select(options= races, label='Choose Race', with_input=True)
-    
-    name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 30})
-    city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
-    state = ui.select(options= state_names, label='Choose State', with_input=True)
-    ui.label('Race Type')
-    r_type = ui.toggle(['sprint','olympic','half ironman','ironman','other'], value='olympic')
-    
-    with ui.input('Date of Race') as date:
-        with date.add_slot('append'):
-            ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
-        with ui.menu() as menu:
-            ui.date().bind_value(date)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Update Race')
+        ui.label('Choose Race to Update')
+        races = {}
+        rid = {}
+        cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+        for (rn, rd) in cursor:
+            r_id = get_id(10)
+            races[r_id] = (rn + ", " + str(rd))
+            rid[r_id] = [rn, rd]
+        
+        upd_race = ui.select(options= races, label='Choose Race', with_input=True)
+        
+        name_input = ui.input(label='Race Name', placeholder='e.g. Patriots Olympic', validation={'Input too long': lambda value: len(value) <= 30})
+        city = ui.input(label='City', placeholder='e.g. Blacksburg', validation={'Input too long': lambda value: len(value) <= 20})
+        state = ui.select(options= state_names, label='Choose State', with_input=True)
+        ui.label('Race Type')
+        r_type = ui.toggle(['sprint','olympic','half ironman','ironman','other'], value='olympic')
+        
+        with ui.input('Date of Race') as date:
+            with date.add_slot('append'):
+                ui.icon('edit_calendar').on('click', lambda: menu.open()).classes('cursor-pointer')
+            with ui.menu() as menu:
+                ui.date().bind_value(date)
 
 
-    #### legs ####
-            
-    
-    ui.label('Swim Leg')
-    swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Type of Swim')
-    open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
+        #### legs ####
+                
+        
+        ui.label('Swim Leg')
+        swim_dist = ui.input(label='Swim Distance in Meters', placeholder='e.g. 1500', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Type of Swim')
+        open_pool = ui.toggle({1: 'Open Water', 0: 'Pool'}, value=0)
 
-    ui.label('Bike Leg')
-    bike_dist = ui.input(label='Bike Distance in Miles', placeholder='e.g. 24.8', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Bike Elevation')
-    bike_elev = ui.input(label='Bike Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
+        ui.label('Bike Leg')
+        bike_dist = ui.input(label='Bike Distance in Miles', placeholder='e.g. 24.8', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Bike Elevation')
+        bike_elev = ui.input(label='Bike Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    ui.label('Run Leg')
-    run_dist = ui.input(label='Run Distance', placeholder='e.g. 6.2', validation={'Input too long': lambda value: len(value) <= 10})
-    ui.label('Run Elevation')
-    run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
+        ui.label('Run Leg')
+        run_dist = ui.input(label='Run Distance', placeholder='e.g. 6.2', validation={'Input too long': lambda value: len(value) <= 10})
+        ui.label('Run Elevation')
+        run_elev = ui.input(label='Run Elevation in Feet', validation={'Input too long': lambda value: len(value) <= 10}, value='0')
 
-    ui.button('Confirm Changes', color='green', on_click = lambda: update_race(rid[upd_race.value][0], city.value, state.value, r_type.value, rid[upd_race.value][1], swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
+        ui.button('Confirm Changes', color='green', on_click = lambda: update_race(rid[upd_race.value][0], city.value, state.value, r_type.value, rid[upd_race.value][1], swim_dist.value, open_pool.value, bike_dist.value, bike_elev.value, run_dist.value, run_elev.value))
+    else:
+        ui.label('You are not authorized')
 
-#################################################
-    
 #insert race results
 @ui.page('/ins_results_page')
 def ins_results_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Insert Results')
-    ui.label('Input Race Results')
-    races = {}
-    rid = {}
-    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
-    for (rn, rd) in cursor:
-        r_id = get_id(10)
-        races[r_id] = (rn + ", " + str(rd))
-        rid[r_id] = [rn, rd]
-    
-    athletes = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        athletes[a_id] = (ln + ", " + fn)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Insert Results')
+        ui.label('Input Race Results')
+        races = {}
+        rid = {}
+        cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+        for (rn, rd) in cursor:
+            r_id = get_id(10)
+            races[r_id] = (rn + ", " + str(rd))
+            rid[r_id] = [rn, rd]
         
-    race_choice = ui.select(options= races, label='Choose Race', with_input=True)
-    athlete_choice = ui.select(options= athletes, label='Choose Athlete', with_input=True)
-
-    #### legs ####
+        athletes = {}
+        cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
+        for (a_id, fn, ln) in cursor:
+            athletes[a_id] = (ln + ", " + fn)
             
-    ui.label('Swim Time')
-    with ui.row():
-        swim_h = ui.number(label='Hours')
-        ui.label(':')
-        swim_m = ui.number(label='Minutes')
-        ui.label(':')
-        swim_s = ui.number(label='Seconds')
+        race_choice = ui.select(options= races, label='Choose Race', with_input=True)
+        athlete_choice = ui.select(options= athletes, label='Choose Athlete', with_input=True)
 
-    ui.label('T1')
-    with ui.row():
-        t1_m = ui.number(label = 'Minutes')
-        ui.label(':')
-        t1_s = ui.number(label = 'Seconds')
+        #### legs ####
+                
+        ui.label('Swim Time')
+        with ui.row():
+            swim_h = ui.number(label='Hours')
+            ui.label(':')
+            swim_m = ui.number(label='Minutes')
+            ui.label(':')
+            swim_s = ui.number(label='Seconds')
 
-    ui.label('Bike Time')
-    with ui.row():
-        bike_h = ui.number(label='Hours')
-        ui.label(':')
-        bike_m = ui.number(label='Minutes')
-        ui.label(':')
-        bike_s = ui.number(label='Seconds')
+        ui.label('T1')
+        with ui.row():
+            t1_m = ui.number(label = 'Minutes')
+            ui.label(':')
+            t1_s = ui.number(label = 'Seconds')
 
-    ui.label('T2')
-    with ui.row():
-        t2_m = ui.number(label = 'Minutes')
-        ui.label(':')
-        t2_s = ui.number(label = 'Seconds')
+        ui.label('Bike Time')
+        with ui.row():
+            bike_h = ui.number(label='Hours')
+            ui.label(':')
+            bike_m = ui.number(label='Minutes')
+            ui.label(':')
+            bike_s = ui.number(label='Seconds')
 
-    ui.label('Run Time')
-    with ui.row():
-        run_h = ui.number(label='Hours')
-        ui.label(':')
-        run_m = ui.number(label='Minutes')
-        ui.label(':')
-        run_s = ui.number(label='Seconds')
+        ui.label('T2')
+        with ui.row():
+            t2_m = ui.number(label = 'Minutes')
+            ui.label(':')
+            t2_s = ui.number(label = 'Seconds')
 
-    ui.label('Total Time')
-    with ui.row():
-        tot_h = ui.number(label='Hours')
-        ui.label(':')
-        tot_m = ui.number(label='Minutes')
-        ui.label(':')
-        tot_s = ui.number(label='Seconds')
+        ui.label('Run Time')
+        with ui.row():
+            run_h = ui.number(label='Hours')
+            ui.label(':')
+            run_m = ui.number(label='Minutes')
+            ui.label(':')
+            run_s = ui.number(label='Seconds')
 
-    ui.button('Submit', on_click = lambda:race(swim_h.value, swim_m.value, swim_s.value,
-                                               t1_m.value, t1_s.value,
-                                               bike_h.value, bike_m.value, bike_s.value,
-                                               t2_m.value, t2_s.value,
-                                               run_h.value, run_m.value, run_s.value,
-                                               tot_h.value, tot_m.value, tot_s.value,
-                                               athlete_choice.value,
-                                               rid[race_choice.value][0], rid[race_choice.value][1]))
+        ui.label('Total Time')
+        with ui.row():
+            tot_h = ui.number(label='Hours')
+            ui.label(':')
+            tot_m = ui.number(label='Minutes')
+            ui.label(':')
+            tot_s = ui.number(label='Seconds')
+
+        ui.button('Submit', on_click = lambda:race(swim_h.value, swim_m.value, swim_s.value,
+                                                t1_m.value, t1_s.value,
+                                                bike_h.value, bike_m.value, bike_s.value,
+                                                t2_m.value, t2_s.value,
+                                                run_h.value, run_m.value, run_s.value,
+                                                tot_h.value, tot_m.value, tot_s.value,
+                                                athlete_choice.value,
+                                                rid[race_choice.value][0], rid[race_choice.value][1]))
+    else:
+        ui.label('You are not authorized')
+
 
 #delete race
 @ui.page('/del_results_page')
 def del_results_page():
-    if not is_connected():
-        connect()
-    ui.page_title('Delete Results')
-    ui.label('Choose Result to Delete')
-    races = {}
-    rid = {}
-    cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
-    for (rn, rd) in cursor:
-        r_id = get_id(10)
-        races[r_id] = (rn + ", " + str(rd))
-        rid[r_id] = [rn, rd]
-    
-    athletes = {}
-    cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
-    for (a_id, fn, ln) in cursor:
-        athletes[a_id] = (ln + ", " + fn)
+    add_common_header()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
+        ui.page_title('Delete Results')
+        ui.label('Choose Result to Delete')
+        races = {}
+        rid = {}
+        cursor.execute("SELECT Racename, RaceDate FROM race ORDER BY RaceDate DESC")
+        for (rn, rd) in cursor:
+            r_id = get_id(10)
+            races[r_id] = (rn + ", " + str(rd))
+            rid[r_id] = [rn, rd]
         
-    race_choice = ui.select(options= races, label='Choose Race', with_input=True)
-    athlete_choice = ui.select(options= athletes, label='Choose Athlete', with_input=True)
+        athletes = {}
+        cursor.execute("SELECT AthleteID, FirstName, LastName FROM athlete ORDER BY LastName ASC")
+        for (a_id, fn, ln) in cursor:
+            athletes[a_id] = (ln + ", " + fn)
+            
+        race_choice = ui.select(options= races, label='Choose Race', with_input=True)
+        athlete_choice = ui.select(options= athletes, label='Choose Athlete', with_input=True)
 
-    ui.button('Delete', color='red', on_click = lambda: remove_race_results(rid[race_choice.value][0], rid[race_choice.value][1], athlete_choice.value))
+        ui.button('Delete', color='red', on_click = lambda: remove_race_results(rid[race_choice.value][0], rid[race_choice.value][1], athlete_choice.value))
+    else:
+        ui.label('You are not authorized')
 
 @ui.page('/race_results')
 def race_results_page():
+    add_common_header()
     if not is_connected():
         connect()
     ui.page_title('View Results')
@@ -708,12 +776,10 @@ def race_results_page():
         grid.update()
     race_button.on('click',filter_race)
     athlete_button.on('click',filter_athlete)
-    ui.run()
-
 
 @ui.page('/all_results')
 def all_results_page():
-    
+    add_common_header()
     if not is_connected():
         connect()
     ui.page_title('All Results')
@@ -787,11 +853,10 @@ def all_results_page():
     ],
     'rowData': results
     }).classes('min-h-screen')
-    ui.run()
 
 @ui.page('/records')
 def records_page():
-    
+    add_common_header()
     if not is_connected():
         connect()
     ui.page_title('Records')
@@ -907,10 +972,10 @@ def records_page():
                 rows = overall_records
                 ui.table(columns=columns, rows=rows, row_key='name')  
   
-    ui.run()
 
 @ui.page('/stats')
 def stats_page():
+    add_common_header()
     if not is_connected():
         connect()
     ui.page_title('Records')
@@ -1107,24 +1172,87 @@ def stats_page():
                 plt.grid(True) 
 
 
-#################################################
-@ui.page('/home')
+@ui.page('/login')
+def login() -> Optional[RedirectResponse]:
+    add_common_header()
+    def try_login() -> None:  # local function to avoid passing username and password as arguments
+        if username.value in users:
+            user = users.get(username.value)
+            if user.get('password') == password.value:
+                app.storage.user.update({'username': username.value, 'authenticated': True, 'role' : user.get('role')})
+                ui.navigate.to(app.storage.user.get('referrer_path', '/'))  # go back to where the user wanted to go
+            else:
+                ui.notify('Wrong username or password', color='negative')
+        else:
+            ui.notify('Wrong username or password', color='negative')
+
+    if app.storage.user.get('authenticated', False):
+        return RedirectResponse('/')
+    with ui.card().classes('absolute-center'):
+        username = ui.input('Username').on('keydown.enter', try_login)
+        password = ui.input('Password', password=True, password_toggle_button=True).on('keydown.enter', try_login)
+        ui.button('Log in', on_click=try_login)
+        ui.button('Create Account', on_click=lambda: ui.navigate.to('/create-account'))
+    return None
+
+@ui.page('/create-account')
+def create_account() -> None:
+    add_common_header()
+    if not is_connected():
+        connect()
+    def add_user() -> None:
+        # Check if all fields are filled
+        if not (new_username.value and email.value and first_name.value and last_name.value and password.value):
+            ui.notify('Please fill in all fields.', color='negative')
+            return
+        
+        # Check if the username already exists
+        cursor.execute("SELECT username FROM users WHERE username = %s", (new_username.value,))
+        if cursor.fetchone():
+            ui.notify('Username already exists!', color='negative')
+            return
+
+        # Insert new user if username is unique
+        
+        cursor.execute("INSERT INTO users (username, password, role, email, FirstName, LastName) VALUES (%s, %s, %s, %s, %s, %s)",
+                       (new_username.value, password.value, role.value if 'admin' in app.storage.user.get('role', '') else 'basic', email.value, first_name.value, last_name.value))
+        cnx.commit()
+        ui.notify('User added successfully', color='positive')
+        ui.navigate.to(app.storage.user.get('referrer_path', '/'))
+
+    with ui.card().classes('absolute-center'):
+        ui.label('Create New Account')
+        new_username = ui.input('Username')
+        email = ui.input('Email')
+        first_name = ui.input('First Name')
+        last_name = ui.input('Last Name')
+        password = ui.input('Password', password=True)
+        if 'admin' in app.storage.user.get('role', ''):
+            role = ui.select(label='Role', options=['basic', 'admin'], value = 'basic')
+        else:
+            role = ui.input(value='basic')
+            role.visible = False  # Hidden and set to basic for non-admins
+        ui.button('Create Account', on_click=add_user)
+
+@ui.page('/')
 def homepage():
+    add_common_header()
     ui.page_title('Multisport Metrics')
-    with ui.card():
-        ui.label('Insert')
-        ui.link('Insert Athlete', ins_athlete_page)
-        ui.link('Insert Race', ins_race_page)
-        ui.link('Insert Race Results', ins_results_page)
-    with ui.card():
-        ui.label('Update')
-        ui.link('Update Athlete', upd_athlete_page)
-        ui.link('Update Race', upd_race_page)
-    with ui.card():
-        ui.label('Delete')
-        ui.link('Delete Athlete', del_athlete_page)
-        ui.link('Delete Race', del_race_page)
-        ui.link('Delete Race Results', del_results_page)
+    if app.storage.user.get('role', '') == 'admin':
+        with ui.card():
+            ui.label('Insert')
+            ui.link('Insert Athlete', ins_athlete_page)
+            ui.link('Insert Race', ins_race_page)
+            ui.link('Insert Race Results', ins_results_page)
+        with ui.card():
+            ui.label('Update')
+            ui.link('Update Athlete', upd_athlete_page)
+            ui.link('Update Race', upd_race_page)
+        with ui.card():
+            ui.label('Delete')
+            ui.link('Delete Athlete', del_athlete_page)
+            ui.link('Delete Race', del_race_page)
+            ui.link('Delete Race Results', del_results_page)
     with ui.card():
         ui.label('View Results')
         ui.link('View Race Results', race_results_page)
@@ -1132,10 +1260,4 @@ def homepage():
         ui.link('Records', records_page)
         ui.link('Statistics', stats_page)
 
-ui.label("Welcome to Multisport Metrics")
-with ui.card():
-    un = ui.input(label='Username')
-    pw = ui.input(label='Password', password=True)
-    button = ui.button('Log In', on_click=lambda: login(un.value, pw.value))
-
-ui.run(title="Multisport Metrics", favicon='🚀')
+ui.run(storage_secret='THIS_NEEDS_TO_BE_CHANGED')
