@@ -4,17 +4,16 @@ Please see the `OAuth2 example at FastAPI <https://fastapi.tiangolo.com/tutorial
 use the great `Authlib package <https://docs.authlib.org/en/v0.13/client/starlette.html#using-fastapi>`_ to implement a classing real authentication system.
 Here we just demonstrate the NiceGUI integration.
 """
+import os
 from typing import Optional
-
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
 from nicegui import Client, app, ui
 import mysql.connector
-from nicegui.events import ValueChangeEventArguments
 import random as rand
-from datetime import date, datetime, timedelta
 import pandas as pd
 from pace import *
 import matplotlib.pyplot as plt
@@ -26,6 +25,12 @@ users = {'user1':{'password': 'pass1', 'role': 'admin'}, 'user2':{'password': 'p
 
 unrestricted_page_routes = {'/login', '/create-account'}
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Retrieve the secret key from an environment variable
+secret_key = os.environ.get('CRYPT_SECRET_KEY')
+cipher_suite = Fernet(secret_key)
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """This middleware restricts access to all NiceGUI pages.
@@ -264,6 +269,7 @@ def add_common_header():
     with ui.header().classes('flex justify-between items-center p-4 bg-blue-500 text-white'):
         ui.label('Multisport Metrics').classes('text-xl')
         if app.storage.user.get('authenticated', False):
+            ui.label(f'Welcome, {app.storage.user["username"]}!')
             ui.button(icon= 'logout', text='Logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes('btn btn-warning')
             ui.button('Account Details', on_click=lambda: ui.navigate.to('/account'))
             if app.storage.user['role'] == 'admin':
@@ -1175,11 +1181,18 @@ def stats_page():
 @ui.page('/login')
 def login() -> Optional[RedirectResponse]:
     add_common_header()
+    if not is_connected():
+        connect()
     def try_login() -> None:  # local function to avoid passing username and password as arguments
-        if username.value in users:
-            user = users.get(username.value)
-            if user.get('password') == password.value:
-                app.storage.user.update({'username': username.value, 'authenticated': True, 'role' : user.get('role')})
+        cursor.execute("SELECT password, role FROM users WHERE username = %s", (username.value.lower(),))
+        user = cursor.fetchone()
+        
+        if user:
+            stored_encrypted_pass = user[0]
+            stored_decrypted_pass = cipher_suite.decrypt(stored_encrypted_pass).decode()
+            if stored_decrypted_pass == password.value:
+
+                app.storage.user.update({'username': username.value, 'authenticated': True, 'role' : user[1]})
                 ui.navigate.to(app.storage.user.get('referrer_path', '/'))  # go back to where the user wanted to go
             else:
                 ui.notify('Wrong username or password', color='negative')
@@ -1207,16 +1220,17 @@ def create_account() -> None:
             return
         
         # Check if the username already exists
-        cursor.execute("SELECT username FROM users WHERE username = %s", (new_username.value,))
+        cursor.execute("SELECT username FROM users WHERE username = %s", (new_username.value.lower(),))
         if cursor.fetchone():
             ui.notify('Username already exists!', color='negative')
             return
 
         # Insert new user if username is unique
-        
+        encrypt_password = cipher_suite.encrypt(password.value.encode()).decode()
         cursor.execute("INSERT INTO users (username, password, role, email, FirstName, LastName) VALUES (%s, %s, %s, %s, %s, %s)",
-                       (new_username.value, password.value, role.value if 'admin' in app.storage.user.get('role', '') else 'basic', email.value, first_name.value, last_name.value))
+                       (new_username.value.lower(), encrypt_password, role.value if 'admin' in app.storage.user.get('role', '') else 'basic', email.value, first_name.value, last_name.value))
         cnx.commit()
+        
         ui.notify('User added successfully', color='positive')
         ui.navigate.to(app.storage.user.get('referrer_path', '/'))
 
@@ -1233,6 +1247,42 @@ def create_account() -> None:
             role = ui.input(value='basic')
             role.visible = False  # Hidden and set to basic for non-admins
         ui.button('Create Account', on_click=add_user)
+
+@ui.page('/edit-users')
+def edit_users() -> None:
+
+    add_common_header()
+    if not is_connected():
+        connect()
+
+    def remove_user_dialogue(username):
+        with ui.dialog() as dialog, ui.card():
+            ui.label(f'Remove user {username}?')
+            with ui.row():
+                ui.button('Yes', on_click=lambda: (remove_user(username), dialog.close()))
+                ui.button('No', on_click=lambda: (dialog.clear(), dialog.close()))
+        dialog.open()
+    def remove_user(username):
+        ####### need to update page upon deletion#########
+        print('deleting')
+        cursor.execute("DELETE FROM users WHERE (username = %s)", (username,))
+        cnx.commit()
+        ui.update()
+    cursor.execute("SELECT FirstName, LastName, username, email, role FROM users")
+    
+    cards = {}
+    with ui.column() as col:
+        for fn, ln, un, em, r in cursor.fetchall():
+            print (un)
+            with ui.card() as cards[un]:
+                ui.label(f'Name: {ln}, {fn}').classes('h1')
+                unlabel = ui.label(f'Username: {un}').classes('h2')
+                ui.label(f'Email: {em}').classes('h2')
+                ui.label(f'Role: {r}')
+                ui.button(text= 'Delete User', color='red', icon='trash', on_click=lambda un = un: remove_user(un))
+    #cursor.reset()
+
+
 
 @ui.page('/')
 def homepage():
@@ -1260,4 +1310,4 @@ def homepage():
         ui.link('Records', records_page)
         ui.link('Statistics', stats_page)
 
-ui.run(storage_secret='THIS_NEEDS_TO_BE_CHANGED')
+ui.run(title= 'Multisport Metrics', storage_secret='THIS_NEEDS_TO_BE_CHANGED')

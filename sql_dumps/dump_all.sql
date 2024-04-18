@@ -292,5 +292,5 @@ CREATE TABLE users (
   role enum('basic', 'admin') NOT NULL,
   PRIMARY KEY (username)
 );
-
-Insert into users values ('John', 'Smith', 'jsmith', '$2b$12$GyR33fvI995RFejU7HV5MuPcELsgmM65Bq0ocyuExwxFsS6EE/poa', 'jsmith@gmail.com', 'admin');
+-- Password is abc123
+Insert into users values ('User', 'One', 'user1', 'gAAAAABmITn7ly76a4Iw2mgMfro8mHY36xBHxBIPRAKaCAsUUWJEqkhvhK5Z-nG2CkMFBc9bZltuz0SRoY7G9mph0E2y3xZS4g==', 'user1@gmail.com', 'admin');
