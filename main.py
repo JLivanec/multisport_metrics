@@ -53,6 +53,7 @@ def get_id(size):
 def connect():
     global cnx
     global cursor
+    ######### fill in your mysql login details as needed ############
     cnx = mysql.connector.connect(
         host='localhost',
         user='root',
@@ -267,16 +268,18 @@ def main_page() -> None:
 
 def add_common_header():
     with ui.header().classes('flex justify-between items-center p-4 bg-blue-500 text-white'):
-        ui.label('Multisport Metrics').classes('text-xl')
+        
         if app.storage.user.get('authenticated', False):
-            ui.label(f'Welcome, {app.storage.user["username"]}!')
-            ui.button(icon= 'logout', text='Logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes('btn btn-warning')
-            ui.button('Account Details', on_click=lambda: ui.navigate.to('/account'))
-            if app.storage.user['role'] == 'admin':
-                with ui.button(text='Admin Tools'):
-                    with ui.menu():
-                        ui.menu_item('Create New User', on_click=lambda: ui.navigate.to('/create-account'))
-                        ui.menu_item('Edit Users', on_click=lambda: ui.navigate.to('/edit-users'))
+            ui.label(f'Welcome, {app.storage.user["username"]}!').classes('text-xl text-white')
+        ui.link('Multisport Metrics', homepage).classes('text-xl text-white')
+        if app.storage.user.get('authenticated', False):
+            with ui.column():
+                ui.button(icon= 'logout', text='Logout', on_click=lambda: (app.storage.user.clear(), ui.navigate.to('/login'))).classes('btn btn-warning')
+                if app.storage.user['role'] == 'admin':
+                    with ui.button(text='Admin Tools'):
+                        with ui.menu():
+                            ui.menu_item('Create New User', on_click=lambda: ui.navigate.to('/create-account'))
+                            ui.menu_item('Edit Users', on_click=lambda: ui.navigate.to('/edit-users'))
 
 #insert athlete
 @ui.page('/ins_athlete_page')
@@ -1250,37 +1253,34 @@ def create_account() -> None:
 
 @ui.page('/edit-users')
 def edit_users() -> None:
-
     add_common_header()
-    if not is_connected():
-        connect()
+    if app.storage.user['role'] == 'admin':
+        if not is_connected():
+            connect()
 
-    def remove_user_dialogue(username):
-        with ui.dialog() as dialog, ui.card():
-            ui.label(f'Remove user {username}?')
-            with ui.row():
-                ui.button('Yes', on_click=lambda: (remove_user(username), dialog.close()))
-                ui.button('No', on_click=lambda: (dialog.clear(), dialog.close()))
-        dialog.open()
-    def remove_user(username):
-        ####### need to update page upon deletion#########
-        print('deleting')
-        cursor.execute("DELETE FROM users WHERE (username = %s)", (username,))
-        cnx.commit()
-        ui.update()
-    cursor.execute("SELECT FirstName, LastName, username, email, role FROM users")
-    
-    cards = {}
-    with ui.column() as col:
-        for fn, ln, un, em, r in cursor.fetchall():
-            print (un)
-            with ui.card() as cards[un]:
-                ui.label(f'Name: {ln}, {fn}').classes('h1')
-                unlabel = ui.label(f'Username: {un}').classes('h2')
-                ui.label(f'Email: {em}').classes('h2')
-                ui.label(f'Role: {r}')
-                ui.button(text= 'Delete User', color='red', icon='trash', on_click=lambda un = un: remove_user(un))
-    #cursor.reset()
+        
+        def remove_user(username):
+            ####### need to update page upon deletion#########
+            print('deleting')
+            cursor.execute("DELETE FROM users WHERE (username = %s)", (username,))
+            cnx.commit()
+            ui.navigate.to('/edit-users')
+        cursor.execute("SELECT FirstName, LastName, username, email, role FROM users")
+        
+        cards = {}
+        with ui.column() as col:
+            for fn, ln, un, em, r in cursor.fetchall():
+                if un != app.storage.user['username']:
+                    print (un)
+                    with ui.card() as cards[un]:
+                        ui.label(f'Name: {ln}, {fn}').classes('h1')
+                        unlabel = ui.label(f'Username: {un}').classes('h2')
+                        ui.label(f'Email: {em}').classes('h2')
+                        ui.label(f'Role: {r}')
+                        ui.button(text= 'Delete User', color='red', on_click=lambda un = un: remove_user(un))
+        #cursor.reset()
+    else:
+        ui.label('You are not authorized')
 
 
 

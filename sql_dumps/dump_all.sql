@@ -292,5 +292,5 @@ CREATE TABLE users (
   role enum('basic', 'admin') NOT NULL,
   PRIMARY KEY (username)
 );
--- Password is abc123
-Insert into users values ('User', 'One', 'user1', 'gAAAAABmITn7ly76a4Iw2mgMfro8mHY36xBHxBIPRAKaCAsUUWJEqkhvhK5Z-nG2CkMFBc9bZltuz0SRoY7G9mph0E2y3xZS4g==', 'user1@gmail.com', 'admin');
+----------------------------------------- INPUT ENCRYPTED PASSWORD BELOW -------------------------------------
+Insert into users values ('Initial', 'Admin', 'admin', 'YOUR ENCRYPTED PASSWORD HERE', 'admin@gmail.com', 'admin');
